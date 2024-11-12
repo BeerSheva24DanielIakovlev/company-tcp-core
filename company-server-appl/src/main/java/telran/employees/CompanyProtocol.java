@@ -1,12 +1,17 @@
 package telran.employees;
 
-import org.json.JSONObject;
-import telran.net.*;
-import static telran.net.ResponseCode.*;
 import java.util.Arrays;
+import java.util.NoSuchElementException;
+
+import org.json.JSONArray;
+
+import telran.net.Protocol;
+import telran.net.Request;
+import telran.net.Response;
+import telran.net.ResponseCode;
 
 public class CompanyProtocol implements Protocol {
-    private Company company;
+    Company company;
 
     public CompanyProtocol(Company company) {
         this.company = company;
@@ -16,79 +21,63 @@ public class CompanyProtocol implements Protocol {
     public Response getResponse(Request request) {
         String requestType = request.requestType();
         String requestData = request.requestData();
-
+        Response response = null;
         try {
-            switch (requestType) {
-                case "addEmployee":
-                    return addEmployee(requestData);
-                case "getEmployee":
-                    return getEmployee(requestData);
-                case "removeEmployee":
-                    return removeEmployee(requestData);
-                case "getDepartmentBudget":
-                    return getDepartmentBudget(requestData);
-                case "getDepartments":
-                    return getDepartments();
-                case "getManagersWithMostFactor":
-                    return getManagersWithMostFactor();
-                default:
-                    return new Response(WRONG_TYPE, "Unknown request type: " + requestType);
-            }
+            response = switch (requestType) {
+                case "addEmployee" -> addEmployee(requestData);
+                case "getEmployee" -> getEmployee(requestData);
+                case "removeEmployee" -> removeEmployee(requestData);
+                case "getDepartmentBudget" -> getDepartmentBudget(requestData);
+                case "getDepartments" -> getDepartments(requestData);
+                case "getManagersWithMostFactor" -> getManagersWithMostFactor(requestData);
+                default -> new Response(ResponseCode.WRONG_TYPE, requestType + " Wrong type");
+            };
         } catch (Exception e) {
-            return new Response(WRONG_DATA, "Error processing request: " + e.getMessage());
+            response = new Response(ResponseCode.WRONG_DATA, e.getMessage());
         }
+        return response;
     }
 
-    private Response addEmployee(String requestData) {
-        Employee employee = parseEmployee(requestData);
-        if (employee == null) {
-            return new Response(WRONG_DATA, "Invalid employee data");
+    Response getOkResponse(String responseData) {
+        return new Response(ResponseCode.OK, responseData);
+    }
+
+    Response addEmployee(String requestData) {
+        Employee empl = Employee.getEmployeeFromJSON(requestData);
+        company.addEmployee(empl);
+        return getOkResponse("");
+    }
+
+    Response getEmployee(String requestData) {
+        long id = Long.parseLong(requestData);
+        Employee empl = company.getEmployee(id);
+        if (empl == null) {
+            throw new NoSuchElementException(String.format("Employee %d not found", id));
         }
-        company.addEmployee(employee);
-        return new Response(ResponseCode.OK, "Employee added successfully");
+        return getOkResponse(empl.toString());
     }
 
-    private Response getEmployee(String requestData) {
+    Response removeEmployee(String requestData) {
         long id = Long.parseLong(requestData);
-        Employee employee = company.getEmployee(id);
-        return employee != null
-                ? new Response(ResponseCode.OK, employee.toString())
-                : new Response(ResponseCode.WRONG_DATA, "Employee not found");
+        Employee empl = company.removeEmployee(id);
+        return getOkResponse(empl.toString());
     }
 
-    private Response removeEmployee(String requestData) {
-        long id = Long.parseLong(requestData);
-        Employee employee = company.removeEmployee(id);
-        return employee != null
-                ? new Response(ResponseCode.OK, "Employee removed: " + employee)
-                : new Response(ResponseCode.WRONG_DATA, "Employee not found");
-    }
-
-    private Response getDepartmentBudget(String requestData) {
+    Response getDepartmentBudget(String requestData) {
         int budget = company.getDepartmentBudget(requestData);
-        return new Response(ResponseCode.OK, "Department budget: " + budget);
+        return getOkResponse(budget + "");
     }
 
-    private Response getDepartments() {
+    Response getDepartments(String requestData) {
         String[] departments = company.getDepartments();
-        return new Response(ResponseCode.OK, Arrays.toString(departments));
+        JSONArray jsonArray = new JSONArray(departments);
+        return getOkResponse(jsonArray.toString());
     }
 
-    private Response getManagersWithMostFactor() {
+    Response getManagersWithMostFactor(String requestData) {
         Manager[] managers = company.getManagersWithMostFactor();
-        return new Response(ResponseCode.OK, Arrays.toString(managers));
+        JSONArray jsonArray = new JSONArray(Arrays.stream(managers).map(Manager::toString).toList());
+        return getOkResponse(jsonArray.toString());
     }
 
-    private Employee parseEmployee(String requestData) {
-        try {
-            JSONObject jsonObject = new JSONObject(requestData);
-            long id = jsonObject.getLong("id");
-            int basicSalary = jsonObject.getInt("basicSalary");
-            String department = jsonObject.getString("department");
-
-            return new Employee(id, basicSalary, department);
-        } catch (Exception e) {
-            return null;
-        }
-    }
 }
