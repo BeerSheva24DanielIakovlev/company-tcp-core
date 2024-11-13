@@ -1,15 +1,12 @@
 package telran.employees;
 
-import java.util.Arrays;
-import java.util.NoSuchElementException;
-
-import org.json.JSONArray;
-
+import java.lang.reflect.Method;
 import telran.net.Protocol;
 import telran.net.Request;
 import telran.net.Response;
 import telran.net.ResponseCode;
 
+@SuppressWarnings("unused")
 public class CompanyProtocol implements Protocol {
     Company company;
 
@@ -23,61 +20,53 @@ public class CompanyProtocol implements Protocol {
         String requestData = request.requestData();
         Response response = null;
         try {
-            response = switch (requestType) {
-                case "addEmployee" -> addEmployee(requestData);
-                case "getEmployee" -> getEmployee(requestData);
-                case "removeEmployee" -> removeEmployee(requestData);
-                case "getDepartmentBudget" -> getDepartmentBudget(requestData);
-                case "getDepartments" -> getDepartments(requestData);
-                case "getManagersWithMostFactor" -> getManagersWithMostFactor(requestData);
-                default -> new Response(ResponseCode.WRONG_TYPE, requestType + " Wrong type");
-            };
+            Method method = this.getClass().getDeclaredMethod(requestType, String.class);
+            method.setAccessible(true);
+            response = (Response) method.invoke(this, requestData);
+        } catch (NoSuchMethodException e) {
+            response = new Response(ResponseCode.WRONG_TYPE, "Unsupported request type: " + requestType);
         } catch (Exception e) {
             response = new Response(ResponseCode.WRONG_DATA, e.getMessage());
         }
         return response;
     }
 
-    Response getOkResponse(String responseData) {
-        return new Response(ResponseCode.OK, responseData);
-    }
-
-    Response addEmployee(String requestData) {
+    private Response addEmployee(String requestData) {
         Employee empl = Employee.getEmployeeFromJSON(requestData);
         company.addEmployee(empl);
-        return getOkResponse("");
+        return new Response(ResponseCode.OK, "");
     }
 
-    Response getEmployee(String requestData) {
+    private Response getEmployee(String requestData) {
         long id = Long.parseLong(requestData);
         Employee empl = company.getEmployee(id);
         if (empl == null) {
-            throw new NoSuchElementException(String.format("Employee %d not found", id));
+            return new Response(ResponseCode.WRONG_DATA, "Employee not found");
         }
-        return getOkResponse(empl.toString());
+        return new Response(ResponseCode.OK, empl.toString());
     }
 
-    Response removeEmployee(String requestData) {
+    private Response removeEmployee(String requestData) {
         long id = Long.parseLong(requestData);
         Employee empl = company.removeEmployee(id);
-        return getOkResponse(empl.toString());
+        if (empl == null) {
+            return new Response(ResponseCode.WRONG_DATA, "Employee not found");
+        }
+        return new Response(ResponseCode.OK, empl.toString());
     }
 
-    Response getDepartmentBudget(String requestData) {
+    private Response getDepartmentBudget(String requestData) {
         int budget = company.getDepartmentBudget(requestData);
-        return getOkResponse(budget + "");
+        return new Response(ResponseCode.OK, String.valueOf(budget));
     }
 
-    Response getDepartments(String requestData) {
+    private Response getDepartments(String requestData) {
         String[] departments = company.getDepartments();
-        JSONArray jsonArray = new JSONArray(departments);
-        return getOkResponse(jsonArray.toString());
+        return new Response(ResponseCode.OK, String.join(",", departments));
     }
 
-    Response getManagersWithMostFactor(String requestData) {
+    private Response getManagersWithMostFactor(String requestData) {
         Manager[] managers = company.getManagersWithMostFactor();
-        JSONArray jsonArray = new JSONArray(Arrays.stream(managers).map(Manager::toString).toList());
-        return getOkResponse(jsonArray.toString());
+        return new Response(ResponseCode.OK, String.join(",", managers.toString()));
     }
-
 }
