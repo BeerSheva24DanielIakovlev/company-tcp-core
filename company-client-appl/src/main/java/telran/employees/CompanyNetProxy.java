@@ -6,11 +6,8 @@ import org.json.JSONArray;
 
 import telran.net.*;
 
-
 public class CompanyNetProxy implements Company{
-    
     NetworkClient netClient;
-    
     public CompanyNetProxy (NetworkClient netClient) {
         this.netClient = netClient;
     }

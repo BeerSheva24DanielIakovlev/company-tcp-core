@@ -10,7 +10,7 @@ import telran.net.*;
 
 public class Main {
     private static final String HOST = "localhost";
-    private static final int PORT = 4000;
+    private static final int PORT = 6000;
 
     public static void main(String[] args) {
         InputOutput io = new StandardInputOutput();
@@ -23,6 +23,7 @@ public class Main {
         io.writeLine("Application is finished");
     }
 
+    @SuppressWarnings("unused")
     private static Item[] addExitItem(Item[] items, NetworkClient netClient) {
        Item[] res = Arrays.copyOf(items, items.length + 1);
        res[items.length] = Item.of("Exit", io -> {
